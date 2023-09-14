@@ -17,12 +17,10 @@ type iface4 struct {
 	gateway netip.Addr
 
 	// subnet is the network subnet.
-	//
-	// TODO(e.burkov):  Make netip.Addr?
 	subnet netip.Prefix
 
 	// addrSpace is the IPv4 address space allocated for leasing.
-	addrSpace *ipRange
+	addrSpace ipRange
 
 	// name is the name of the interface.
 	name string
@@ -111,20 +109,24 @@ type DHCPServer struct {
 	// information about its clients.
 	enabled *atomic.Bool
 
+	// localTLD is the top-level domain name to use for resolving DHCP
+	// clients' hostnames.
+	localTLD string
+
 	// interfaces4 is the set of IPv4 interfaces sorted by interface name.
 	interfaces4 []*iface4
 
 	// interfaces6 is the set of IPv6 interfaces sorted by interface name.
 	interfaces6 []*iface6
+
+	// icmpTimeout is the timeout for checking another DHCP server's presence.
+	icmpTimeout time.Duration
 }
 
 // New creates a new DHCP server with the given configuration.  It returns an
 // error if the given configuration can't be used.
 func New(conf *Config) (srv *DHCPServer, err error) {
-	if err = conf.Validate(); err != nil {
-		// Don't wrap the error since it's informative enough as is.
-		return nil, err
-	} else if !conf.Enabled {
+	if !conf.Enabled {
 		// TODO(e.burkov):  !! return Empty?
 		return nil, nil
 	}
@@ -161,5 +163,7 @@ func New(conf *Config) (srv *DHCPServer, err error) {
 		enabled:     enabled,
 		interfaces4: ifaces4,
 		interfaces6: ifaces6,
+		localTLD:    conf.LocalDomainName,
+		icmpTimeout: conf.ICMPTimeout,
 	}, nil
 }

@@ -2,6 +2,7 @@ package dhcpsvc
 
 import (
 	"net/netip"
+	"strconv"
 	"testing"
 
 	"github.com/AdguardTeam/golibs/testutil"
@@ -12,24 +13,9 @@ import (
 func TestNewIPRange(t *testing.T) {
 	start4 := netip.MustParseAddr("0.0.0.1")
 	end4 := netip.MustParseAddr("0.0.0.3")
-	start6 := netip.AddrFrom16([16]byte{
-		0x01, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x01,
-	})
-	end6 := netip.AddrFrom16([16]byte{
-		0x01, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x03,
-	})
-	end6Large := netip.AddrFrom16([16]byte{
-		0x02, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x03,
-	})
+	start6 := netip.MustParseAddr("1::1")
+	end6 := netip.MustParseAddr("1::3")
+	end6Large := netip.MustParseAddr("2::3")
 
 	testCases := []struct {
 		start      netip.Addr
@@ -57,10 +43,16 @@ func TestNewIPRange(t *testing.T) {
 		name:       "start_eq_end",
 		wantErrMsg: "invalid ip range: start is greater than or equal to end",
 	}, {
-		start:      start6,
-		end:        end6Large,
-		name:       "too_large",
-		wantErrMsg: "invalid ip range: range is too large",
+		start: start6,
+		end:   end6Large,
+		name:  "too_large",
+		wantErrMsg: "invalid ip range: range length should be less or equal to " +
+			strconv.FormatUint(maxRangeLen, 10),
+	}, {
+		start:      start4,
+		end:        end6,
+		name:       "different_family",
+		wantErrMsg: "invalid ip range: start and end should be within the same address family",
 	}}
 
 	for _, tc := range testCases {
@@ -100,6 +92,10 @@ func TestIPRange_Contains(t *testing.T) {
 		in:   netip.MustParseAddr("0.0.0.4"),
 		want: assert.False,
 		name: "after",
+	}, {
+		in:   netip.MustParseAddr("::"),
+		want: assert.False,
+		name: "another_family",
 	}}
 
 	for _, tc := range testCases {
@@ -107,11 +103,6 @@ func TestIPRange_Contains(t *testing.T) {
 			tc.want(t, r.contains(tc.in))
 		})
 	}
-
-	t.Run("nil", func(t *testing.T) {
-		r = nil
-		assert.False(t, r.contains(start))
-	})
 }
 
 func TestIPRange_Find(t *testing.T) {
@@ -164,11 +155,6 @@ func TestIPRange_Find(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
-
-	t.Run("nil", func(t *testing.T) {
-		r = nil
-		assert.Equal(t, netip.Addr{}, r.find(func(netip.Addr) bool { return true }))
-	})
 }
 
 func TestIPRange_Offset(t *testing.T) {
@@ -215,11 +201,4 @@ func TestIPRange_Offset(t *testing.T) {
 			assert.Equal(t, tc.wantOK, ok)
 		})
 	}
-
-	t.Run("nil", func(t *testing.T) {
-		r = nil
-		offset, ok := r.offset(start)
-		assert.False(t, ok)
-		assert.Zero(t, offset)
-	})
 }

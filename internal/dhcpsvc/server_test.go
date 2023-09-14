@@ -9,9 +9,10 @@ import (
 	"github.com/AdguardTeam/golibs/testutil"
 )
 
-func TestNew(t *testing.T) {
-	const validLocalTLD = "local"
+// testLocalTLD is a common local TLD for tests.
+const testLocalTLD = "local"
 
+func TestNew(t *testing.T) {
 	validIPv4Conf := &dhcpsvc.IPv4Config{
 		Enabled:       true,
 		GatewayIP:     netip.MustParseAddr("192.168.0.1"),
@@ -50,69 +51,9 @@ func TestNew(t *testing.T) {
 		name       string
 		wantErrMsg string
 	}{{
-		conf:       nil,
-		name:       "nil_config",
-		wantErrMsg: "config is nil",
-	}, {
-		conf: &dhcpsvc.Config{
-			Enabled: false,
-		},
-		name:       "disabled",
-		wantErrMsg: "",
-	}, {
-		conf: &dhcpsvc.Config{
-			Enabled: true,
-		},
-		name:       "bad_local_tld",
-		wantErrMsg: `bad domain name "": domain name is empty`,
-	}, {
 		conf: &dhcpsvc.Config{
 			Enabled:         true,
-			LocalDomainName: validLocalTLD,
-			Interfaces:      nil,
-		},
-		name:       "no_interfaces",
-		wantErrMsg: "no interfaces specified",
-	}, {
-		conf: &dhcpsvc.Config{
-			Enabled:         true,
-			LocalDomainName: validLocalTLD,
-			Interfaces: map[string]*dhcpsvc.InterfaceConfig{
-				"eth0": nil,
-			},
-		},
-		name:       "nil_interface",
-		wantErrMsg: `interface "eth0": config is nil`,
-	}, {
-		conf: &dhcpsvc.Config{
-			Enabled:         true,
-			LocalDomainName: validLocalTLD,
-			Interfaces: map[string]*dhcpsvc.InterfaceConfig{
-				"eth0": {
-					IPv4: nil,
-					IPv6: &dhcpsvc.IPv6Config{Enabled: false},
-				},
-			},
-		},
-		name:       "nil_ipv4",
-		wantErrMsg: `interface "eth0": ipv4: config is nil`,
-	}, {
-		conf: &dhcpsvc.Config{
-			Enabled:         true,
-			LocalDomainName: validLocalTLD,
-			Interfaces: map[string]*dhcpsvc.InterfaceConfig{
-				"eth0": {
-					IPv4: &dhcpsvc.IPv4Config{Enabled: false},
-					IPv6: nil,
-				},
-			},
-		},
-		name:       "nil_ipv6",
-		wantErrMsg: `interface "eth0": ipv6: config is nil`,
-	}, {
-		conf: &dhcpsvc.Config{
-			Enabled:         true,
-			LocalDomainName: validLocalTLD,
+			LocalDomainName: testLocalTLD,
 			Interfaces: map[string]*dhcpsvc.InterfaceConfig{
 				"eth0": {
 					IPv4: validIPv4Conf,
@@ -125,7 +66,7 @@ func TestNew(t *testing.T) {
 	}, {
 		conf: &dhcpsvc.Config{
 			Enabled:         true,
-			LocalDomainName: validLocalTLD,
+			LocalDomainName: testLocalTLD,
 			Interfaces: map[string]*dhcpsvc.InterfaceConfig{
 				"eth0": {
 					IPv4: &dhcpsvc.IPv4Config{Enabled: false},
@@ -138,7 +79,7 @@ func TestNew(t *testing.T) {
 	}, {
 		conf: &dhcpsvc.Config{
 			Enabled:         true,
-			LocalDomainName: validLocalTLD,
+			LocalDomainName: testLocalTLD,
 			Interfaces: map[string]*dhcpsvc.InterfaceConfig{
 				"eth0": {
 					IPv4: gwInRangeConf,
@@ -152,7 +93,7 @@ func TestNew(t *testing.T) {
 	}, {
 		conf: &dhcpsvc.Config{
 			Enabled:         true,
-			LocalDomainName: validLocalTLD,
+			LocalDomainName: testLocalTLD,
 			Interfaces: map[string]*dhcpsvc.InterfaceConfig{
 				"eth0": {
 					IPv4: badStartConf,
