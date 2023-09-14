@@ -1,13 +1,12 @@
 package updater
 
 import (
-	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"github.com/AdguardTeam/AdGuardHome/internal/aghalg"
@@ -23,19 +22,16 @@ func TestMain(m *testing.M) {
 	testutil.DiscardLogOutput(m)
 }
 
-func startHTTPServer(data string) (l net.Listener, portStr string) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(data))
-	})
+func startHTTPServer(t *testing.T, data []byte) (c *http.Client, u *url.URL) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(ts.Close)
 
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		panic(err)
-	}
+	u, err := url.Parse(ts.URL)
+	require.NoError(t, err)
 
-	go func() { _ = http.Serve(listener, mux) }()
-	return listener, strconv.FormatUint(uint64(listener.Addr().(*net.TCPAddr).Port), 10)
+	return ts.Client(), u
 }
 
 func TestUpdateGetVersion(t *testing.T) {
@@ -68,22 +64,17 @@ func TestUpdateGetVersion(t *testing.T) {
   "download_freebsd_arm64": "https://static.adtidy.org/adguardhome/beta/AdGuardHome_freebsd_arm64.tar.gz"
 }`
 
-	l, lport := startHTTPServer(jsonData)
-	testutil.CleanupAndRequireSuccess(t, l.Close)
+	fakeClient, fakeURL := startHTTPServer(t, []byte(jsonData))
+	fakeURL.Path = path.Join("adguardhome", version.ChannelBeta, "version.json")
 
 	u := NewUpdater(&Config{
-		Client:  &http.Client{},
+		Client:  fakeClient,
 		Version: "v0.103.0-beta.1",
 		Channel: version.ChannelBeta,
 		GOARCH:  "arm",
 		GOOS:    "linux",
 	})
 
-	fakeURL := &url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort("127.0.0.1", lport),
-		Path:   path.Join("adguardhome", version.ChannelBeta, "version.json"),
-	}
 	u.versionCheckURL = fakeURL.String()
 
 	info, err := u.VersionInfo(false)
@@ -116,19 +107,13 @@ func TestUpdate(t *testing.T) {
 	pkgData, err := os.ReadFile("testdata/AdGuardHome.tar.gz")
 	require.NoError(t, err)
 
-	l, lport := startHTTPServer(string(pkgData))
-	testutil.CleanupAndRequireSuccess(t, l.Close)
+	fakeClient, fakeURL := startHTTPServer(t, pkgData)
+	fakeURL.Path = "AdGuardHome.tar.gz"
 
 	u := NewUpdater(&Config{
-		Client:  &http.Client{},
+		Client:  fakeClient,
 		Version: "v0.103.0",
 	})
-
-	fakeURL := &url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort("127.0.0.1", lport),
-		Path:   "AdGuardHome.tar.gz",
-	}
 
 	u.workDir = wd
 	u.confName = yamlPath
@@ -194,20 +179,14 @@ func TestUpdateWindows(t *testing.T) {
 	pkgData, err := os.ReadFile("testdata/AdGuardHome.zip")
 	require.NoError(t, err)
 
-	l, lport := startHTTPServer(string(pkgData))
-	testutil.CleanupAndRequireSuccess(t, l.Close)
+	fakeClient, fakeURL := startHTTPServer(t, pkgData)
+	fakeURL.Path = "AdGuardHome.zip"
 
 	u := NewUpdater(&Config{
-		Client:  &http.Client{},
+		Client:  fakeClient,
 		GOOS:    "windows",
 		Version: "v0.103.0",
 	})
-
-	fakeURL := &url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort("127.0.0.1", lport),
-		Path:   "AdGuardHome.zip",
-	}
 
 	u.workDir = wd
 	u.confName = yamlPath
@@ -265,11 +244,11 @@ func TestUpdater_VersionInto_ARM(t *testing.T) {
   "download_linux_armv7": "https://static.adtidy.org/adguardhome/beta/AdGuardHome_linux_armv7.tar.gz"
 }`
 
-	l, lport := startHTTPServer(jsonData)
-	testutil.CleanupAndRequireSuccess(t, l.Close)
+	fakeClient, fakeURL := startHTTPServer(t, []byte(jsonData))
+	fakeURL.Path = path.Join("adguardhome", version.ChannelBeta, "version.json")
 
 	u := NewUpdater(&Config{
-		Client:  &http.Client{},
+		Client:  fakeClient,
 		Version: "v0.103.0-beta.1",
 		Channel: version.ChannelBeta,
 		GOARCH:  "arm",
@@ -277,11 +256,6 @@ func TestUpdater_VersionInto_ARM(t *testing.T) {
 		GOARM:   "7",
 	})
 
-	fakeURL := &url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort("127.0.0.1", lport),
-		Path:   path.Join("adguardhome", version.ChannelBeta, "version.json"),
-	}
 	u.versionCheckURL = fakeURL.String()
 
 	info, err := u.VersionInfo(false)
@@ -302,11 +276,11 @@ func TestUpdater_VersionInto_MIPS(t *testing.T) {
   "download_linux_mips_softfloat": "https://static.adtidy.org/adguardhome/beta/AdGuardHome_linux_mips_softfloat.tar.gz"
 }`
 
-	l, lport := startHTTPServer(jsonData)
-	testutil.CleanupAndRequireSuccess(t, l.Close)
+	fakeClient, fakeURL := startHTTPServer(t, []byte(jsonData))
+	fakeURL.Path = path.Join("adguardhome", version.ChannelBeta, "version.json")
 
 	u := NewUpdater(&Config{
-		Client:  &http.Client{},
+		Client:  fakeClient,
 		Version: "v0.103.0-beta.1",
 		Channel: version.ChannelBeta,
 		GOARCH:  "mips",
@@ -314,11 +288,6 @@ func TestUpdater_VersionInto_MIPS(t *testing.T) {
 		GOMIPS:  "softfloat",
 	})
 
-	fakeURL := &url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort("127.0.0.1", lport),
-		Path:   path.Join("adguardhome", version.ChannelBeta, "version.json"),
-	}
 	u.versionCheckURL = fakeURL.String()
 
 	info, err := u.VersionInfo(false)
